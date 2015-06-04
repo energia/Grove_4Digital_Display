@@ -29,16 +29,14 @@
  * THE SOFTWARE.
  */
 
-#include <EEPROM.h>
-#include <TimerOne.h>
-#include <avr/pgmspace.h>
+#include "OneMsTaskTimer.h"
 #include "TM1637.h"
 #define ON 1
 #define OFF 0
 
 int8_t TimeDisp[] = {0x00,0x00,0x00,0x00};
 unsigned char ClockPoint = 1;
-unsigned char Update;
+unsigned char Update = ON;
 unsigned char microsecond_10 = 0;
 unsigned char second;
 unsigned char _microsecond_10 = 0;
@@ -46,22 +44,22 @@ unsigned char _second;
 unsigned int eepromaddr;
 boolean Flag_ReadTime;
 
-#define CLK 2//pins definitions for TM1637 and can be changed to other ports
-#define DIO 3
+#define CLK 39//pins definitions for TM1637 and can be changed to other ports
+#define DIO 38
 TM1637 tm1637(CLK,DIO);
+OneMsTaskTimer_t myTask1 ={10, TimingISR, 0, 0};
 
 void setup()
 {
-  Serial.begin(9600);
+  Serial.begin(115200);
   tm1637.set(BRIGHT_TYPICAL);//BRIGHT_TYPICAL = 2,BRIGHT_DARKEST = 0,BRIGHTEST = 7;
   tm1637.init();
-  Timer1.initialize(10000);//timing for 10ms
-  Timer1.attachInterrupt(TimingISR);//declare the interrupt serve routine:TimingISR
+  OneMsTaskTimer::add(&myTask1); // 500ms period
+  OneMsTaskTimer::start();
+
   Serial.println("Please send command to control the stopwatch:");
   Serial.println("S - start");
   Serial.println("P - pause");
-  Serial.println("L - list the time");
-  Serial.println("W - write the time to EEPROM ");
   Serial.println("R - reset");
 }
 void loop()
@@ -72,8 +70,6 @@ void loop()
   {
     case 'S':stopwatchStart();Serial.println("Start timing...");break;
     case 'P':stopwatchPause();Serial.println("Stopwatch was paused");break;
-    case 'L':readTime();break;
-    case 'W':saveTime();Serial.println("Save the time");break;
     case 'R':stopwatchReset();Serial.println("Stopwatch was reset");break;
     default:break;
   }
@@ -115,12 +111,11 @@ void TimeUpdate(void)
 }
 void stopwatchStart()//timer1 on
 {
-  Flag_ReadTime = 0;
-  TCCR1B |= Timer1.clockSelectBits;
+  OneMsTaskTimer::start();
 }
 void stopwatchPause()//timer1 off if [CS12 CS11 CS10] is [0 0 0].
 {
-  TCCR1B &= ~(_BV(CS10) | _BV(CS11) | _BV(CS12));
+  OneMsTaskTimer::stop();
 }
 void stopwatchReset()
 {
@@ -132,24 +127,4 @@ void stopwatchReset()
   second = 0;
   Update = ON;
 }
-void saveTime()
-{
-  EEPROM.write(eepromaddr ++,microsecond_10);
-  EEPROM.write(eepromaddr ++,second);
-}
-void readTime()
-{
-  Flag_ReadTime = 1;
-  if(eepromaddr == 0)
-  {
-    Serial.println("The time had been read");
-    _microsecond_10 = 0;
-    _second = 0;
-  }
-  else{
-  _second = EEPROM.read(-- eepromaddr);
-  _microsecond_10 = EEPROM.read(-- eepromaddr);
-  Serial.println("List the time");
-  }
-  Update = ON;
-}
+

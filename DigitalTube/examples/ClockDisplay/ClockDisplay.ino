@@ -27,7 +27,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#include <TimerOne.h>
+#include "OneMsTaskTimer.h"
 #include "TM1637.h"
 #define ON 1
 #define OFF 0
@@ -41,17 +41,20 @@ unsigned char minute = 0;
 unsigned char hour = 12;
 
 
-#define CLK 2//pins definitions for TM1637 and can be changed to other ports
-#define DIO 3
+#define CLK 39//pins definitions for TM1637 and can be changed to other ports
+#define DIO 38
 TM1637 tm1637(CLK,DIO);
+
+OneMsTaskTimer_t myTask1 ={500, TimingISR, 0, 0};
 
 void setup()
 {
   tm1637.set();
   tm1637.init();
-  Timer1.initialize(500000);//timing for 500ms
-  Timer1.attachInterrupt(TimingISR);//declare the interrupt serve routine:TimingISR
+  OneMsTaskTimer::add(&myTask1); // 500ms period
+  OneMsTaskTimer::start();
 }
+
 void loop()
 {
   if(Update == ON)
